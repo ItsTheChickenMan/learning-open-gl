@@ -20,6 +20,7 @@ typedef u32 ShaderProgram;
 u32 createShader(char* shaderPath, GLenum shaderType);
 void deleteShader(u32 shader);
 ShaderProgram createShaderProgram(u32 vertexShader, u32 fragmentShader);
+ShaderProgram createShaderProgram(u32 vertexShader, u32 fragmentShader, const char* shaderName, const char* vertexName, const char* fragmentName);
 void useShader(ShaderProgram *program);
 
 void setUniformFloat(ShaderProgram program, const char* location, float data);

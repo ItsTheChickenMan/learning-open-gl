@@ -38,9 +38,9 @@ int main(){
 	u32 unlitFs = createShader("./shaders/unlitfs.glsl", SHADER_FRAGMENT);
 	
 	// create and link shader program
-	ShaderProgram mainShader = createShaderProgram(vertexShader, fragmentShader); // textures
-	ShaderProgram texturelessShader = createShaderProgram(untexturedVs, untexturedFs); // no textures, only colors
-	ShaderProgram lightSourceShader = createShaderProgram(untexturedVs, unlitFs); // used for light sources
+	ShaderProgram mainShader = createShaderProgram(vertexShader, fragmentShader, "mainShader", "vertexShader", "fragmentShader"); // textures
+	ShaderProgram lightSourceShader = createShaderProgram(untexturedVs, unlitFs, "lightSourceShader", "untexturedVs", "unlitFs"); // used for light sources
+	ShaderProgram texturelessShader = createShaderProgram(untexturedVs, untexturedFs, "texturelessShader", "untexturedVs", "untexturedFs"); // no textures, only colors
 
 	// delete shaders
 	deleteShader(vertexShader);
@@ -71,7 +71,7 @@ int main(){
 	
 	setUniformInt(texturelessShader, "material.diffuseMap", 0);
 	setUniformInt(texturelessShader, "material.specularMap", 1);
-	setUniformInt(texturelessShader, "material.emissionMap", 2);
+	//setUniformInt(texturelessShader, "material.emissionMap", 2);
 	
 	// create object data from vertex data
 	Object_Data cube3D = createObjectData(&cubeVertices, glm::vec3(0.0f, 0.95f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), &pinkMaterial);
@@ -111,6 +111,10 @@ int main(){
 		glm::vec3(21.0f, 22.0f, 23.0f),
 		glm::vec3(10.0f, 20.0f, 30.0f),
 		glm::vec3(40.0f, 50.0f, 60.0f)
+	};
+	
+	glm::vec3 pointLights[] = {
+		
 	};
 	
 	float delta = 1.0f;
@@ -175,9 +179,9 @@ int main(){
 		mainCamera.rotation.y += mouseDeltaX*sensitivity;
 		
 		if(mainCamera.rotation.x > 89.0f)
-        mainCamera.rotation.x = 89.0f;
-    if(mainCamera.rotation.x < -89.0f)
-        mainCamera.rotation.x = -89.0f;
+			mainCamera.rotation.x = 89.0f;
+		if(mainCamera.rotation.x < -89.0f)
+			mainCamera.rotation.x = -89.0f;
 			
 		// rendering
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -186,12 +190,12 @@ int main(){
 		light.direction = mainCamera.direction;
 		
 		// set uniforms
-		setUniformSpotLight(&light, texturelessShader);
+		setUniformSpotLight(&light, texturelessShader, "light");
 		setUniformMaterial(&pinkMaterial, texturelessShader);
 		
 		// update objects
 		updateObjectData(&cube3D);
-		//updateObjectData(&litCube);	
+		//updateObjectData(&litCube);
 		
 		for(int i = 0; i < sizeof(pointLights)/sizeof(glm::vec3); i++){
 			cube3D.position = cubePositions[i];

@@ -68,6 +68,29 @@ ShaderProgram createShaderProgram(u32 vertexShader, u32 fragmentShader){
 	return program;
 }
 
+// create a shader program with names for more error info
+ShaderProgram createShaderProgram(u32 vertexShader, u32 fragmentShader, const char* shaderName, const char* vertexName, const char* fragmentName){
+	// create program
+	ShaderProgram program = glCreateProgram();
+	
+	// attach shaders
+	glAttachShader(program, vertexShader);
+	glAttachShader(program, fragmentShader);
+	
+	// link shaders
+	glLinkProgram(program);
+	
+	int success;
+	glGetProgramiv(program, GL_LINK_STATUS, &success);
+	if(!success){
+		char info[512];
+		glGetProgramInfoLog(program, 512, NULL, info);
+		printf("failed to link shader program %s (vertex: %s, fragment: %s): %s\n", shaderName, vertexName, fragmentName, info);
+	}
+
+	return program;
+}
+
 // use a shader program
 void useShader(ShaderProgram *program){
 	glUseProgram(*program);
