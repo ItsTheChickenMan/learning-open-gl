@@ -17,6 +17,10 @@
 #define WIDTH 800
 #define HEIGHT 600
 
+// fullscreen
+//#define WIDTH 1366
+//#define HEIGHT 768
+
 #define WIDTHF (float)WIDTH
 #define HEIGHTF (float)HEIGHT
 
@@ -74,13 +78,13 @@ int main(){
 	//setUniformInt(texturelessShader, "material.emissionMap", 2);
 	
 	// create object data from vertex data
-	Object_Data cube3D = createObjectData(&cubeVertices, glm::vec3(0.0f, 0.95f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), &pinkMaterial);
-	Object_Data litCube = createObjectData(&cubeVertices, glm::vec3(2.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), &whiteMaterial);
+	Object_Data cube3D = createObjectData(&cubeVertices, glm::vec3(0.0f, 0.95f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.1f, 0.1f, 0.1f), &pinkMaterial);
+	Object_Data litCube = createObjectData(&cubeVertices, glm::vec3(2.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f), &whiteMaterial);
 	
 	// lights and stuff
 	//Light light = createLight(cube3D.position, glm::vec3(1.0f, 1.0f, 1.0f), 0.1, 1.0, 0.5);
 	//PointLight light = createPointLight(glm::vec3(-0.2f, -1.0f, -0.3f), 1.0f, 0.09f, 0.032f, glm::vec3(1.0f, 1.0f, 1.0f), 0.1, 1.0, 0.5);
-	SpotLight light = createSpotLight(cube3D.position, glm::vec3(-0.2f, -1.0f, -0.3f), glm::radians(12.0f), glm::radians(16.0f), 1.0f, 0.09f, 0.032f, glm::vec3(1.0f, 1.0f, 1.0f), 0.1, 1.0, 1.0);
+	//SpotLight light = createSpotLight(cube3D.position, glm::vec3(-0.2f, -1.0f, -0.3f), glm::radians(12.0f), glm::radians(16.0f), 1.0f, 0.09f, 0.032f, glm::vec3(1.0f, 1.0f, 1.0f), 0.1, 1.0, 1.0);
 	
 	// create camera
 	Camera mainCamera = createCamera(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, -90.0f, 0.0f), 45.0f, WIDTHF / HEIGHTF, 0.1f, 100.0f);
@@ -113,9 +117,17 @@ int main(){
 		glm::vec3(40.0f, 50.0f, 60.0f)
 	};
 	
-	glm::vec3 pointLights[] = {
-		
+	PointLight pointLights[] = {
+		createPointLight(glm::vec3(0.0f, 1.0f, 0.0f), 1.0f, 0.35f, 0.44f, glm::vec3(0.0f, 1.0f, 0.0f), 0.1f, 1.0f, 1.0f),
+		createPointLight(glm::vec3(5.0f, 1.0f, 2.0f), 1.0f, 0.09f, 0.032f, glm::vec3(1.0f, 1.0f, 1.0f), 0.1f, 1.0f, 1.0f),
+		createPointLight(glm::vec3(-3.0f, -1.0f, -2.0f), 1.0f, 0.1f, 0.03f, glm::vec3(1.0f, 0.0f, 0.0f), 0.1f, 1.0f, 1.0f)
 	};
+	
+	SpotLight flashlight = createSpotLight(mainCamera.position, glm::vec3(-0.2f, -1.0f, -0.3f), glm::radians(12.0f), glm::radians(16.0f), 1.0f, 0.09f, 0.032f, glm::vec3(1.0f, 1.0f, 1.0f), 0.1, 1.0, 1.0);
+	
+	for(int i = 0; i < sizeof(pointLights)/sizeof(PointLight); i++){
+		pushPointLight(texturelessShader, &(pointLights[i]));
+	}
 	
 	float delta = 1.0f;
 	float lastFrame = 0.0f;
@@ -185,22 +197,10 @@ int main(){
 			
 		// rendering
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		
-		light.position = mainCamera.position;
-		light.direction = mainCamera.direction;
-		
-		// set uniforms
-		setUniformSpotLight(&light, texturelessShader, "light");
+
 		setUniformMaterial(&pinkMaterial, texturelessShader);
 		
 		// update objects
-		updateObjectData(&cube3D);
-		//updateObjectData(&litCube);
-		
-		for(int i = 0; i < sizeof(pointLights)/sizeof(glm::vec3); i++){
-			cube3D.position = cubePositions[i];
-		}
-		
 		for(int i = 0; i < sizeof(cubePositions)/sizeof(glm::vec3); i++){
 			litCube.position = cubePositions[i];
 			litCube.rotation = cubeRotations[i];
@@ -209,6 +209,24 @@ int main(){
 			drawObjectData(&litCube, &mainCamera, &texturelessShader);
 		}
 		
+		// draw lights
+		for(int i = 0; i < sizeof(pointLights)/sizeof(PointLight); i++){
+			cube3D.position = pointLights[i].position;
+			
+			updateObjectData(&cube3D);
+			
+			float col[] = {pointLights[i].color.x, pointLights[i].color.y, pointLights[i].color.z};
+			
+			setUniformFloat(lightSourceShader, "lightColor", col, 3);	
+			drawObjectData(&cube3D, &mainCamera, &lightSourceShader);
+		}
+		
+		// update flashlight
+		flashlight.position = mainCamera.position;
+		flashlight.direction = mainCamera.direction;
+		
+		resetSpotLights();
+		pushSpotLight(texturelessShader, &flashlight);
 		
 		//drawObjectData(&cube3D, &mainCamera, &lightSourceShader);
 		//drawObjectData(&litCube, &mainCamera, &texturelessShader);

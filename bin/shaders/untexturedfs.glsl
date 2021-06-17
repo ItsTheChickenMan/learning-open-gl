@@ -31,6 +31,8 @@ struct DirectionalLight {
 	float ambient;
 	float diffuse;
 	float specular;
+	
+	bool exists; // when setting a light, set this to true so the shader knows to actually calculate it
 };
 
 struct PointLight {
@@ -46,6 +48,8 @@ struct PointLight {
 	float ambient; // ambient brightness (not color)
 	float diffuse; // diffuse brightness (not color)
 	float specular; // specular brightness (not color)
+	
+	bool exists; // when setting a light, set this to true so the shader knows to actually calculate it
 };
 
 struct SpotLight {
@@ -65,6 +69,8 @@ struct SpotLight {
 	float ambient; // ambient brightness (not color)
 	float diffuse; // diffuse brightness (not color)
 	float specular; // specular brightness (not color)
+	
+	bool exists; // when setting a light, set this to true so the shader knows to actually calculate it
 };
 
 in vec3 Normal;
@@ -97,9 +103,9 @@ void main(){
 	vec3 emissionTextureSample = vec3(texture(material.emissionMap, TexCoords));
 	
 	// final values
-	vec3 ambient = 	material.color * diffuseTextureSample;
-	vec3 diffuse = 	material.color * diffuseTextureSample;
-	vec3 specular = material.specularStrength * specularTextureSample;
+	vec3 ambient = 	vec3(0.0f, 0.0f, 0.0f);
+	vec3 diffuse = 	vec3(0.0f, 0.0f, 0.0f);
+	vec3 specular = vec3(0.0f, 0.0f, 0.0f);
 	
 	// loop through each light
 	for(int i = 0; i < MAX_POINT_LIGHTS; i++){
@@ -107,46 +113,45 @@ void main(){
 		PointLight l = pointLights[i];
 		
 		// for now, this is a cheap hack to test if the light actually exists (if not then ambient should be undefined and this if will progress)
-		if(l.ambient >= 0.0f || l.ambient < 0.0f){
-			float ambientFactor = 1.0f; // ambience unchanged
-	
-			// diffuse
-			vec3 normalNormal = normalize(Normal);
-			vec3 lightDir = normalize(l.position - FragPos);
-			float diffuseFactor = max(dot(normalNormal, lightDir), 0.0);
+		if(l.exists){
+			vec3 lightingFactors = calculatePointLight(l, material);
 			
-			// specular
-			vec3 viewDir = normalize(cameraPos - FragPos); // view space calculation
-			vec3 reflectDir = reflect(-lightDir, normalNormal);
-			float specularFactor = pow(max(dot(viewDir, reflectDir), 0.0), material.shininess);
-
-			float dist = length(l.position - FragPos);
-			float attenuation = 1.0 / (l.constant + l.linear*dist + l.quadratic*dist*dist);
-			
-			vec3 lightingFactors = vec3(ambientFactor*attenuation, diffuseFactor*attenuation, specularFactor*attenuation);
-			
-			ambient *= 1.0f;
-			diffuse *= lightingFactors.y;
-			//specular *= lightingFactors.z;
+			ambient += material.color * diffuseTextureSample * lightingFactors.x * l.color * l.ambient;
+			diffuse += material.color * diffuseTextureSample * lightingFactors.y * l.color * l.diffuse;
+			specular += material.specularStrength * specularTextureSample * lightingFactors.z * l.color * l.specular;
+		} else {
+			break;
 		}
 	}
-	/*
+	
 	for(int i = 0; i < MAX_SPOT_LIGHTS; i++){
-		vec3 lightingFactors = calculateSpotLight(spotLights[i], material);
+		SpotLight l = spotLights[i];
 		
-		ambient *= lightingFactors.x;
-		diffuse *= lightingFactors.y;
-		specular *= lightingFactors.z;
+		if(l.exists){	
+			vec3 lightingFactors = calculateSpotLight(l, material);
+			
+			ambient += material.color * diffuseTextureSample * lightingFactors.x * l.color * l.ambient;
+			diffuse += material.color * diffuseTextureSample * lightingFactors.y * l.color * l.diffuse;
+			specular += material.specularStrength * specularTextureSample * lightingFactors.z * l.color * l.specular;
+		} else {
+			break;
+		}
 	}
 	
 	for(int i = 0; i < MAX_DIRECTIONAL_LIGHTS; i++){
-		vec3 lightingFactors = calculateDirectionalLight(directionalLights[i], material);
+		DirectionalLight l = directionalLights[i];
 		
-		ambient *= lightingFactors.x;
-		diffuse *= lightingFactors.y;
-		specular *= lightingFactors.z;
+		if(l.exists){
+			vec3 lightingFactors = calculateDirectionalLight(directionalLights[i], material);
+			
+			ambient += material.color * diffuseTextureSample * lightingFactors.x * l.color * l.ambient;
+			diffuse += material.color * diffuseTextureSample * lightingFactors.y * l.color * l.diffuse;
+			specular += material.specularStrength * specularTextureSample * lightingFactors.z * l.color * l.specular;
+		} else {
+			break;
+		}
 	}
-	*/
+	
 	// final color
 	vec3 final = ambient + diffuse + specular;
 	FragColor = vec4(final, 1.0);

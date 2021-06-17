@@ -277,6 +277,9 @@ void setUniformDirectionalLight(DirectionalLight *light, ShaderProgram program, 
 	
 	strcpy(location, buffer);
 	setUniformFloat(program, strcat(location, ".specular"), &light->specular, 1);
+	
+	strcpy(location, buffer);
+	setUniformInt(program, strcat(location, ".exists"), 1);
 }
 
 // point lights
@@ -329,6 +332,9 @@ void setUniformPointLight(PointLight *light, ShaderProgram program, const char* 
 	
 	strcpy(location, buffer);
 	setUniformFloat(program, strcat(location, ".specular"), &light->specular, 1);
+	
+	strcpy(location, buffer);
+	setUniformInt(program, strcat(location, ".exists"), 1);
 }
 
 SpotLight createSpotLight(glm::vec3 position, glm::vec3 direction, float angle, float outerAngle, float constant, float linear, float quadratic, glm::vec3 color, float ambient, float diffuse, float specular){
@@ -384,6 +390,9 @@ void setUniformSpotLight(SpotLight *light, ShaderProgram program, const char* bu
 	setUniformFloat(program, strcat(location, ".diffuse"), &light->diffuse, 1);
 	strcpy(location, buffer);
 	setUniformFloat(program, strcat(location, ".specular"), &light->specular, 1);
+	
+	strcpy(location, buffer);
+	setUniformInt(program, strcat(location, ".exists"), 1);
 }
 
 // SHADER LIGHT MANAGEMENT //
@@ -455,7 +464,7 @@ void resetDirectionalLights(){
 // 3D OBJECTS //
 
 // create a 3d object
-Object_Data createObjectData(Vertex_Data *vertexData, glm::vec3 position, glm::vec3 rotation, Material *material){
+Object_Data createObjectData(Vertex_Data *vertexData, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale, Material *material){
 	Object_Data object;
 	
 	// assign vertex data
@@ -464,6 +473,7 @@ Object_Data createObjectData(Vertex_Data *vertexData, glm::vec3 position, glm::v
 	// assign position/rotation
 	object.position = position;
 	object.rotation = rotation;
+	object.scale = scale;
 	
 	// create model matrix (stays as an identity matrix until updated)
 	object.modelMatrix = glm::mat4(1.0f);
@@ -487,6 +497,8 @@ void updateObjectData(Object_Data *object){
 	object->modelMatrix = glm::rotate(object->modelMatrix, object->rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
 	object->modelMatrix = glm::rotate(object->modelMatrix, object->rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
 	object->modelMatrix = glm::rotate(object->modelMatrix, object->rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
+	
+	object->modelMatrix = glm::scale(object->modelMatrix, object->scale);
 }
 
 // draw object from the perspective of camera with shaderProgram

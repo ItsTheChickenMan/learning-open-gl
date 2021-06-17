@@ -120,6 +120,7 @@ struct Object_Data {
 	
 	glm::vec3 position; // position
 	glm::vec3 rotation; // rotation
+	glm::vec3 scale;
 	
 	glm::mat4 modelMatrix; // model matrix used for transformations
 	
@@ -153,7 +154,7 @@ void resetSpotLights();
 void pushDirectionalLight(ShaderProgram program, DirectionalLight *light);
 void resetDirectionalLights();
 
-Object_Data createObjectData(Vertex_Data *vertexData, glm::vec3 position, glm::vec3 rotation, Material *material);
+Object_Data createObjectData(Vertex_Data *vertexData, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale, Material *material);
 void updateObjectData(Object_Data *object);
 void drawObjectData(Object_Data *object, Camera *camera, ShaderProgram *program);
 
