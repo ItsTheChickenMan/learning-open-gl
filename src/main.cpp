@@ -5,6 +5,7 @@
 #include <shapes.h>
 #include <graphics.h>
 #include <camera.h>
+#include <model.h>
 
 #include <ctgmath>
 
@@ -40,46 +41,51 @@ int main(){
 	u32 untexturedVs = createShader("./shaders/untexturedvs.glsl", SHADER_VERTEX);
 	u32 untexturedFs = createShader("./shaders/untexturedfs.glsl", SHADER_FRAGMENT);
 	u32 unlitFs = createShader("./shaders/unlitfs.glsl", SHADER_FRAGMENT);
+	u32 meshRendererVs = createShader("./shaders/meshrenderer.vs", SHADER_VERTEX);
+	u32 meshRendererFs = createShader("./shaders/meshrenderer.fs", SHADER_FRAGMENT);
 	
 	// create and link shader program
 	ShaderProgram mainShader = createShaderProgram(vertexShader, fragmentShader, "mainShader", "vertexShader", "fragmentShader"); // textures
 	ShaderProgram lightSourceShader = createShaderProgram(untexturedVs, unlitFs, "lightSourceShader", "untexturedVs", "unlitFs"); // used for light sources
 	ShaderProgram texturelessShader = createShaderProgram(untexturedVs, untexturedFs, "texturelessShader", "untexturedVs", "untexturedFs"); // no textures, only colors
-
+	ShaderProgram meshShader = createShaderProgram(meshRendererVs, meshRendererFs, "meshShader", "meshRendererVs", "meshRendererFs");
+	
 	// delete shaders
 	deleteShader(vertexShader);
 	deleteShader(fragmentShader);
 	deleteShader(untexturedVs);
 	deleteShader(untexturedFs);
+	deleteShader(unlitFs);
+	deleteShader(meshRendererVs);
+	deleteShader(meshRendererFs);
 	
 	// textures
 	Texture_Data texture1 = createTexture("./textures/container.png");
 	Texture_Data texture1_specular = createTexture("./textures/container_specular.png"); // ./textures/container_specular.png
 	Texture_Data texture1_emission = createTexture("./textures/matrix.jpg");
-	Texture_Data texture2 = createTexture("./textures/money.jpg");
+	Texture_Data texture2 = createTexture("./textures/nullpointer.jpg");
 	
 	// materials
 	Material pinkMaterial = createMaterial(glm::vec3(1.0f, 0.0f, 0.5f), 64, 0.5);
 	//Material redMaterial = createMaterial(glm::vec3(1.0f, 0.0f, 0.0f), 64, 0.5);
-	//Material emerald = createMaterial(glm::vec3(0.07568, 0.61424, 0.07568), 76.8, 1.0);
+	Material emerald = createMaterial(glm::vec3(0.07568, 0.61424, 0.07568), 76.8, 1.0);
 	Material whiteMaterial = createMaterial(glm::vec3(1.0, 1.0, 1.0), 64, 1.0);
+	Material magentaMaterial = createMaterial(glm::vec3(0.67578125, 0.07421875, 0.4453125), 128, 1.0);
 	
 	// create triangle vertex data
 	//Vertex_Data triangle = createVertexData(triangle_vertices, 3, sizeof(triangle_vertices));
 	//Vertex_Data rectangle = createVertexData(rectangle_vertices, 4, sizeof(rectangle_vertices), rectangle_indices, 6, sizeof(rectangle_indices));
 	Vertex_Data cubeVertices = createVertexData(cube_vertices, 36, sizeof(cube_vertices));
 	
-	bindTextureToVertexData(&cubeVertices, &texture1, DIFFUSE_MAP);
-	bindTextureToVertexData(&cubeVertices, &texture1_specular, SPECULAR_MAP);
+	bindTextureToMaterial(&whiteMaterial, &texture1, DIFFUSE_MAP);
+	bindTextureToMaterial(&whiteMaterial, &texture1_specular, SPECULAR_MAP);
 	//bindTextureToVertexData(&cubeVertices, &texture1_emission, EMISSION_MAP);
-	
-	setUniformInt(texturelessShader, "material.diffuseMap", 0);
-	setUniformInt(texturelessShader, "material.specularMap", 1);
-	//setUniformInt(texturelessShader, "material.emissionMap", 2);
 	
 	// create object data from vertex data
 	Object_Data cube3D = createObjectData(&cubeVertices, glm::vec3(0.0f, 0.95f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.1f, 0.1f, 0.1f), &pinkMaterial);
 	Object_Data litCube = createObjectData(&cubeVertices, glm::vec3(2.0f, 0.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 1.0f, 1.0f), &whiteMaterial);
+	
+	Model survivalBackpack = loadModel("./models/backpack/backpack.obj");
 	
 	// lights and stuff
 	//Light light = createLight(cube3D.position, glm::vec3(1.0f, 1.0f, 1.0f), 0.1, 1.0, 0.5);
@@ -118,15 +124,15 @@ int main(){
 	};
 	
 	PointLight pointLights[] = {
-		createPointLight(glm::vec3(0.0f, 1.0f, 0.0f), 1.0f, 0.35f, 0.44f, glm::vec3(0.0f, 1.0f, 0.0f), 0.1f, 1.0f, 1.0f),
+		createPointLight(glm::vec3(0.0f, 1.0f, 0.0f), 1.0f, 0.35f, 0.44f, glm::vec3(1.0f, 0.0f, 1.0f), 0.1f, 1.0f, 1.0f),
 		createPointLight(glm::vec3(5.0f, 1.0f, 2.0f), 1.0f, 0.09f, 0.032f, glm::vec3(1.0f, 1.0f, 1.0f), 0.1f, 1.0f, 1.0f),
 		createPointLight(glm::vec3(-3.0f, -1.0f, -2.0f), 1.0f, 0.1f, 0.03f, glm::vec3(1.0f, 0.0f, 0.0f), 0.1f, 1.0f, 1.0f)
 	};
 	
-	SpotLight flashlight = createSpotLight(mainCamera.position, glm::vec3(-0.2f, -1.0f, -0.3f), glm::radians(12.0f), glm::radians(16.0f), 1.0f, 0.09f, 0.032f, glm::vec3(1.0f, 1.0f, 1.0f), 0.1, 1.0, 1.0);
+	SpotLight flashlight = createSpotLight(mainCamera.position, glm::vec3(-0.2f, -1.0f, -0.3f), glm::radians(12.0f), glm::radians(15.0f), 1.0f, 0.09f, 0.032f, glm::vec3(1.0f, 1.0f, 1.0f), 0.1, 1.0, 1.0);
 	
 	for(int i = 0; i < sizeof(pointLights)/sizeof(PointLight); i++){
-		pushPointLight(texturelessShader, &(pointLights[i]));
+		pushPointLight(meshShader, &(pointLights[i]));
 	}
 	
 	float delta = 1.0f;
@@ -152,6 +158,9 @@ int main(){
 		// handle input
 		float cameraSpeed = 2.0f * delta;
 		
+		if (glfwGetKey(mainWindow.glfwWindow, GLFW_KEY_Q) == GLFW_PRESS)
+			cameraSpeed *= 5.0f;
+		
 		if (glfwGetKey(mainWindow.glfwWindow, GLFW_KEY_W) == GLFW_PRESS)
 			mainCamera.position += cameraSpeed * mainCamera.forward;
 		if (glfwGetKey(mainWindow.glfwWindow, GLFW_KEY_S) == GLFW_PRESS)
@@ -165,25 +174,22 @@ int main(){
 			mainCamera.position += glm::normalize(-mainCamera.up) * cameraSpeed;
 		if (glfwGetKey(mainWindow.glfwWindow, GLFW_KEY_SPACE) == GLFW_PRESS)
 			mainCamera.position += glm::normalize(mainCamera.up) * cameraSpeed;
-
+		
+		// I have no idea why, but if I remove these six lines lighting completely stops working and everything appears pitch black
 		if (glfwGetKey(mainWindow.glfwWindow, GLFW_KEY_UP) == GLFW_PRESS)
 			cube3D.position += cameraSpeed * mainCamera.forward;
 		if (glfwGetKey(mainWindow.glfwWindow, GLFW_KEY_DOWN) == GLFW_PRESS)
 			cube3D.position -= cameraSpeed * mainCamera.forward;
 		if (glfwGetKey(mainWindow.glfwWindow, GLFW_KEY_LEFT) == GLFW_PRESS)
 			cube3D.position -= glm::normalize(glm::cross(mainCamera.forward, mainCamera.up)) * cameraSpeed;
-		if (glfwGetKey(mainWindow.glfwWindow, GLFW_KEY_RIGHT) == GLFW_PRESS)
-			cube3D.position += glm::normalize(glm::cross(mainCamera.forward, mainCamera.up)) * cameraSpeed;
-		
-		if (glfwGetKey(mainWindow.glfwWindow, GLFW_KEY_Q) == GLFW_PRESS)
-			cube3D.position += glm::normalize(-mainCamera.up) * cameraSpeed;
-		if (glfwGetKey(mainWindow.glfwWindow, GLFW_KEY_E) == GLFW_PRESS)
-			cube3D.position += glm::normalize(mainCamera.up) * cameraSpeed;
+
+		// update camera
+		updateCamera(&mainCamera);
 		
 		// set camera pos in uniform
 		float pos[] = {mainCamera.position.x, mainCamera.position.y, mainCamera.position.z};
 		
-		setUniformFloat(texturelessShader, "cameraPos", pos, 3);
+		setUniformFloat(meshShader, "cameraPos", pos, 3);
 		
 		// rotate camera
 		float sensitivity = 0.1f;
@@ -194,20 +200,29 @@ int main(){
 			mainCamera.rotation.x = 89.0f;
 		if(mainCamera.rotation.x < -89.0f)
 			mainCamera.rotation.x = -89.0f;
-			
+		
+		// update flashlight
+		flashlight.position = mainCamera.position;
+		flashlight.direction = mainCamera.direction;
+		
+		resetSpotLights();
+		pushSpotLight(meshShader, &flashlight);
+		
 		// rendering
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-		setUniformMaterial(&pinkMaterial, texturelessShader);
+		//setUniformMaterial(&pinkMaterial, meshShader);
 		
 		// update objects
-		for(int i = 0; i < sizeof(cubePositions)/sizeof(glm::vec3); i++){
+		/*for(int i = 0; i < sizeof(cubePositions)/sizeof(glm::vec3); i++){
 			litCube.position = cubePositions[i];
 			litCube.rotation = cubeRotations[i];
-			
+		
 			updateObjectData(&litCube);
-			drawObjectData(&litCube, &mainCamera, &texturelessShader);
-		}
+			drawObjectData(&litCube, &mainCamera, &meshShader);
+		}*/
+		updateModel(&survivalBackpack);
+		drawModel(&survivalBackpack, &mainCamera, &meshShader);
 		
 		// draw lights
 		for(int i = 0; i < sizeof(pointLights)/sizeof(PointLight); i++){
@@ -221,18 +236,8 @@ int main(){
 			drawObjectData(&cube3D, &mainCamera, &lightSourceShader);
 		}
 		
-		// update flashlight
-		flashlight.position = mainCamera.position;
-		flashlight.direction = mainCamera.direction;
-		
-		resetSpotLights();
-		pushSpotLight(texturelessShader, &flashlight);
-		
 		//drawObjectData(&cube3D, &mainCamera, &lightSourceShader);
 		//drawObjectData(&litCube, &mainCamera, &texturelessShader);
-		
-		// update camera
-		updateCamera(&mainCamera);
 		
 		// swap buffers, poll events
 		windowUpdate(&mainWindow);

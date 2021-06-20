@@ -7,6 +7,10 @@ struct Material {
 	sampler2D specularMap;
 	sampler2D emissionMap;
 	
+	bool hasTexture;
+	bool hasSpecular;
+	bool hasEmission;
+	
 	vec3 color;
 	
 	float shininess; // how reflective material is (from 0 to Infinity)
@@ -101,6 +105,18 @@ void main(){
 	vec3 diffuseTextureSample = vec3(texture(material.diffuseMap, TexCoords));
 	vec3 specularTextureSample = vec3(texture(material.specularMap, TexCoords));
 	vec3 emissionTextureSample = vec3(texture(material.emissionMap, TexCoords));
+	
+	if(!material.hasTexture){
+			diffuseTextureSample = vec3(1, 1, 1);
+	}
+	
+	if(!material.hasSpecular){
+		specularTextureSample = vec3(1, 1, 1);
+	}
+	
+	if(!material.hasEmission){
+		emissionTextureSample = vec3(1, 1, 1);
+	}
 	
 	// final values
 	vec3 ambient = 	vec3(0.0f, 0.0f, 0.0f);

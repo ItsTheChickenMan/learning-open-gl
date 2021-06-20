@@ -3,6 +3,7 @@
 #include <graphics.h>
 
 #include <cstdio>
+#include <cstring>
 
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
@@ -14,9 +15,6 @@
 // create vertex data
 Vertex_Data createVertexData(float *vertexData, u32 vertexCount, u32 dataSize){
 	Vertex_Data data;
-	
-	// does not yet have a texture
-	data.hasTexture = false;
 	
 	// no EBO
 	data.usingEBO = false;
@@ -58,9 +56,6 @@ Vertex_Data createVertexData(float *vertexData, u32 vertexCount, u32 dataSize){
 // overload which allows also for the specification of an EBO, which causes the Vertex_Data to be drawn using indices
 Vertex_Data createVertexData(float *vertexData, u32 vertexCount, u32 dataSize, u32 *indices, u32 indicesCount, u32 indicesSize){
 	Vertex_Data data;
-	
-	// does not yet have a texture
-	data.hasTexture = false;
 	
 	// using EBO
 	data.usingEBO = true;
@@ -105,41 +100,9 @@ Vertex_Data createVertexData(float *vertexData, u32 vertexCount, u32 dataSize, u
 	return data;
 }
 
-// bind a texture to vertex data (you might've guessed)
-void bindTextureToVertexData(Vertex_Data *vertexData, Texture_Data *textureData, int type){
-	if(type == DIFFUSE_MAP){
-		vertexData->texture = textureData->texture;
-		vertexData->hasTexture = true;
-	} else if(type == SPECULAR_MAP){
-		vertexData->specularMap = textureData->texture;
-		vertexData->hasSpecularMap = true;
-	} else if(type == EMISSION_MAP){
-		vertexData->emissionMap = textureData->texture;
-		vertexData->hasEmissionMap = true;
-	}
-}
-
 // draw vertex data using shaderProgram assuming shader takes no matrices for transformations (generally unused)
 void drawVertexData(Vertex_Data *data, ShaderProgram *shaderProgram){
 	useShader(shaderProgram);
-	
-	// bind texture if available
-	if(data->hasTexture){
-		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_2D, data->texture);
-	}
-	
-	// bind specular map if available
-	if(data->hasSpecularMap){
-		glActiveTexture(GL_TEXTURE1);
-		glBindTexture(GL_TEXTURE_2D, data->specularMap);
-	}
-	
-	// bind emission map if available
-	if(data->hasEmissionMap){
-		glActiveTexture(GL_TEXTURE2);
-		glBindTexture(GL_TEXTURE_2D, data->emissionMap);
-	}
 	
 	glBindVertexArray(data->VAO);
 	
@@ -147,13 +110,17 @@ void drawVertexData(Vertex_Data *data, ShaderProgram *shaderProgram){
 		glDrawArrays(GL_TRIANGLES, 0, data->vertexCount);
 	else
 		glDrawElements(GL_TRIANGLES, data->indicesCount, GL_UNSIGNED_INT, 0);
+	
+	glBindVertexArray(0);
 }
 
 // TEXTURE MANAGEMENT //
 
 // create a texture
-Texture_Data createTexture(char* path){
+Texture_Data createTexture(const char* path){
 	Texture_Data textureData;
+	
+	textureData.path = std::string(path);
 	
 	// load texture data
 	stbi_set_flip_vertically_on_load(true); // flip because opengl expects textures to start at end of buffer
@@ -181,6 +148,9 @@ Texture_Data createTexture(char* path){
 		
 		// generate mipmaps
 		glGenerateMipmap(GL_TEXTURE_2D);
+		
+		glBindTexture(GL_TEXTURE_2D, 0);
+		
 	} else {
 		printf("error loading texture %s\n", path);
 	}
@@ -200,7 +170,22 @@ Material createMaterial(glm::vec3 color, float shininess, float specularStrength
 	material.shininess = shininess;
 	material.specularStrength = specularStrength;
 	
+	material.diffuseCount = 0;
+	material.specularCount = 0;
+	material.emissionCount = 0;
+	
 	return material;
+}
+
+// bind a texture to vertex data (you might've guessed)
+void bindTextureToMaterial(Material *material, Texture_Data *textureData, int type){
+	if(type == DIFFUSE_MAP){
+		material->diffuseMaps[material->diffuseCount++] = textureData->texture;
+	} else if(type == SPECULAR_MAP){
+		material->specularMaps[material->specularCount++] = textureData->texture;
+	} else if(type == EMISSION_MAP){
+		material->emissionMaps[material->emissionCount++] = textureData->texture;
+	}
 }
 
 // TODO: change naming conventions and stuff
@@ -210,6 +195,10 @@ void setUniformMaterial(Material *material, ShaderProgram program){
 	setUniformFloat(program, "material.color", color, 3);
 	setUniformFloat(program, "material.shininess", &material->shininess, 1);
 	setUniformFloat(program, "material.specularStrength", &material->specularStrength, 1);
+	
+	setUniformInt(program, "material.diffuseCount", material->diffuseCount);
+	setUniformInt(program, "material.specularCount", material->specularCount);
+	setUniformInt(program, "material.emissionCount", material->emissionCount);
 }
 
 // LIGHTS //
@@ -516,6 +505,45 @@ void drawObjectData(Object_Data *object, Camera *camera, ShaderProgram *program)
 	float color[] = {object->material.color.x, object->material.color.y, object->material.color.z};
 	
 	setUniformMaterial(&object->material, *program);
+	
+	char locationBuffer[64];
+	int currentTexture = 0;
+	
+	// bind textures
+	for(int i = 0; i < object->material.diffuseCount || 0; i++){
+		glActiveTexture(GL_TEXTURE0 + currentTexture);
+		glBindTexture(GL_TEXTURE_2D, object->material.diffuseMaps[i]);
+		
+		strcpy(locationBuffer, "");
+		sprintf(locationBuffer, "material.diffuseMaps[%d]", i);
+		setUniformInt(*program, locationBuffer, currentTexture);
+		
+		currentTexture++;
+	}
+	
+	// bind specular maps
+	for(int i = 0; i < object->material.specularCount; i++){
+		glActiveTexture(GL_TEXTURE0 + currentTexture);
+		glBindTexture(GL_TEXTURE_2D, object->material.specularMaps[i]);
+		
+		strcpy(locationBuffer, "");
+		sprintf(locationBuffer, "material.specularMaps[%d]", i);
+		setUniformInt(*program, locationBuffer, currentTexture);
+		
+		currentTexture++;
+	}
+	
+	// bind emission maps
+	for(int i = 0; i < object->material.emissionCount || 0; i++){
+		glActiveTexture(GL_TEXTURE0 + currentTexture);
+		glBindTexture(GL_TEXTURE_2D, object->material.emissionMaps[i]);
+		
+		strcpy(locationBuffer, "");
+		sprintf(locationBuffer, "material.emissionMaps[%d]", i);
+		setUniformInt(*program, locationBuffer, currentTexture);
+		
+		currentTexture++;
+	}
 	
 	drawVertexData(object->vertexData, program);
 }

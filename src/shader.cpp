@@ -30,7 +30,7 @@ u32 createShader(char* shaderPath, GLenum shaderType){
 		// get error
 		glGetShaderInfoLog(shader, 512, NULL, info);
 		
-		printf("shader compilation error: %s\n", info);
+		printf("%s shader compilation error: %s\n", shaderPath, info);
 	}
 	
 	printf("successfully compiled %s shader\n", shaderPath);

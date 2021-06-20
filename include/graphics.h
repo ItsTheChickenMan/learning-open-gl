@@ -3,6 +3,8 @@
 #ifndef PRACTICE_GRAPHICS_H
 #define PRACTICE_GRAPHICS_H
 
+#include <string>
+
 #include <shader.h>
 #include <types.h>
 #include <camera.h>
@@ -29,16 +31,6 @@ struct Vertex_Data {
 	
 	u32 EBO; // element buffer object id
 	bool usingEBO; // whether or not this vertex data uses EBO (for drawVertexData calls)
-	
-	// TODO: multiple textures
-	u32 texture; // texture id
-	bool hasTexture; // whether or not texture is bound
-	
-	u32 specularMap; // texture id
-	bool hasSpecularMap; // whether or not texture is bound
-	
-	u32 emissionMap; // texture id
-	bool hasEmissionMap; // whether or not texture is bound
 };
 
 // texture data
@@ -48,9 +40,21 @@ struct Texture_Data {
 	s32 channels;
 	
 	u32 texture; // id of opengl texture buffer
+	
+	std::string path;
 };
 
 struct Material {
+	// TODO: multiple textures
+	u32 diffuseMaps[8]; // texture id
+	int diffuseCount; // whether or not texture is bound
+	
+	u32 specularMaps[8]; // texture id
+	int specularCount; // whether or not texture is bound
+	
+	u32 emissionMaps[8]; // texture id
+	int emissionCount; // whether or not texture is bound
+	
 	glm::vec3 color;
 	
 	float shininess; // the literal shininess value in specular equation
@@ -130,12 +134,12 @@ struct Object_Data {
 
 Vertex_Data createVertexData(float *vertexData, u32 vertexCount, u32 dataSize);
 Vertex_Data createVertexData(float *vertexData, u32 vertexCount, u32 dataSize, u32 *indices, u32 indicesCount, u32 indicesSize);
-void bindTextureToVertexData(Vertex_Data *vertexData, Texture_Data *textureData, int type);
 void drawVertexData(Vertex_Data *data, ShaderProgram *shaderProgram);
 
-Texture_Data createTexture(char* path);
+Texture_Data createTexture(const char* path);
 
 Material createMaterial(glm::vec3 color, float shininess, float specularStrength);
+void bindTextureToMaterial(Material *material, Texture_Data *textureData, int type);
 void setUniformMaterial(Material *material, ShaderProgram program);
 
 Light createLight(glm::vec3 position, glm::vec3 color, float ambient, float diffuse, float specular);

@@ -9,7 +9,7 @@ SRC_DIR=./src/
 _SRC=*.cpp glad/glad.c
 SRC=$(patsubst %,$(SRC_DIR)%,$(_SRC))
 
-LIBS=-lglfw3 -lopengl32 -lgdi32 -luser32 -lkernel32
+LIBS=-lglfw3 -lassimp -lzlibstatic -lopengl32 -lgdi32 -luser32 -lkernel32
 
 CFLAGS=-I$(INC_DIR) -L$(LIB_DIR) $(LIBS) -Wall -Wno-write-strings
 
