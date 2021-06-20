@@ -457,7 +457,7 @@ Object_Data createObjectData(Vertex_Data *vertexData, glm::vec3 position, glm::v
 	Object_Data object;
 	
 	// assign vertex data
-	object.vertexData = vertexData;
+	object.vertexData = *vertexData;
 
 	// assign position/rotation
 	object.position = position;
@@ -545,5 +545,5 @@ void drawObjectData(Object_Data *object, Camera *camera, ShaderProgram *program)
 		currentTexture++;
 	}
 	
-	drawVertexData(object->vertexData, program);
+	drawVertexData(&object->vertexData, program);
 }

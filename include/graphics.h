@@ -120,7 +120,7 @@ struct SpotLight {
 
 // a 3 dimensional object which uses a Vertex_Data as the base and has a position, and rotation
 struct Object_Data {
-	Vertex_Data *vertexData; // vertex data to reference when drawing
+	Vertex_Data vertexData; // vertex data to reference when drawing
 	
 	glm::vec3 position; // position
 	glm::vec3 rotation; // rotation

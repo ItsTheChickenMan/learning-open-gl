@@ -165,7 +165,6 @@ void drawModel(Model *model, Camera *camera, ShaderProgram *program){
 	setUniformMat4(*program, "view", camera->view);
 	
 	for(int i = 0; i < model->meshes.size(); i++){
-		printf("rendering mesh %d\n", i);
 		/*Object_Data *object = &model->meshes[i];
 		
 		setUniformMat4(*program, "model", object->modelMatrix);
