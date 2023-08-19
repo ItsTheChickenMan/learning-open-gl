@@ -86,6 +86,11 @@ GLboolean windowShouldClose(Window *window){
 	return glfwWindowShouldClose(window->glfwWindow);
 }
 
+void windowEnableMSAA(u32 samples){
+	glfwWindowHint(GLFW_SAMPLES, samples); // open the sample buffer
+	// ...that's it
+}
+
 // log a thing
 s32 windowLog(char* log){
 	printf("Window log: %s\n", log);

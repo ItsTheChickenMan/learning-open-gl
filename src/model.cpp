@@ -34,15 +34,47 @@ Model loadModel(std::string path){
 	return model;
 }
 
+Model loadModel(std::string path, glm::vec3 position, glm::vec3 rotation, glm::vec3 scale){
+	Model model;
+	
+	model.position = glm::vec3(0, 0, 0);
+	model.rotation = glm::vec3(0, 0, 0);
+	model.scale = glm::vec3(1, 1, 1);
+	
+	Assimp::Importer importer;
+	
+	printf("loading model %s...\n", path.c_str());
+	const aiScene *scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs);
+	
+	if(!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode){
+		printf("error (assimp): %s\n", importer.GetErrorString());
+		return model;
+	}
+	
+	printf("model loaded\n");
+	
+	model.path = path.substr(0, path.find_last_of('/'));
+	
+	printf("parsing model %s...\n", path.c_str());
+	processAssimpNode(&model, scene->mRootNode, scene);
+	printf("parsed.\n");
+	
+	model.position = position;
+	model.rotation = rotation;
+	model.scale = scale;
+	
+	return model;
+}
+
 void processAssimpNode(Model *model, aiNode *node, const aiScene *scene){
 	// loop through each mesh in this node and process them
-	for(int i = 0; i < node->mNumMeshes; i++){
+	for(unsigned int i = 0; i < node->mNumMeshes; i++){
 		aiMesh *mesh = scene->mMeshes[node->mMeshes[i]];
 		model->meshes.push_back(processAssimpMesh(mesh, scene, model->path));
 	}
 	
 	// loop through each child of this node
-	for(int i = 0; i < node->mNumChildren; i++){
+	for(unsigned int i = 0; i < node->mNumChildren; i++){
 		processAssimpNode(model, node->mChildren[i], scene);
 	}
 }
@@ -62,7 +94,7 @@ Object_Data processAssimpMesh(aiMesh *mesh, const aiScene *scene, std::string pa
 	// process vertices
 	int verticesIndex = 0; // index in buffer
 	
-	for(int i = 0; i < mesh->mNumVertices; i++){
+	for(unsigned int i = 0; i < mesh->mNumVertices; i++){
 		// push vertex coordinates
 		vertices[verticesIndex++] = mesh->mVertices[i].x;
 		vertices[verticesIndex++] = mesh->mVertices[i].y;
@@ -85,10 +117,10 @@ Object_Data processAssimpMesh(aiMesh *mesh, const aiScene *scene, std::string pa
 	
 	// process indices
 	int indicesIndex = 0;
-	for(int i = 0; i < mesh->mNumFaces; i++){
+	for(unsigned int i = 0; i < mesh->mNumFaces; i++){
 		aiFace face = mesh->mFaces[i];
 		
-		for(int j = 0; j < face.mNumIndices; j++){
+		for(unsigned int j = 0; j < face.mNumIndices; j++){
 			indices[indicesIndex++] = face.mIndices[j];
 		}
 	}
@@ -117,12 +149,12 @@ Object_Data processAssimpMesh(aiMesh *mesh, const aiScene *scene, std::string pa
 }
 
 void bindAssimpTexturesToMaterial(Material *material, aiMaterial *assimpMat, aiTextureType type, int intType, std::string modelDirectory){
-	for(int i = 0; i < assimpMat->GetTextureCount(type); i++){
+	for(unsigned int i = 0; i < assimpMat->GetTextureCount(type); i++){
 		aiString path;
 		assimpMat->GetTexture(type, i, &path);
 		
 		bool usedCached = false;
-		for(int j = 0; j < textureCache.size(); j++){
+		for(unsigned int j = 0; j < textureCache.size(); j++){
 			if(strcmp( textureCache[j].path.c_str(), (modelDirectory + "/" + path.C_Str()).c_str() ) == 0){
 				bindTextureToMaterial(material, &textureCache[j], intType);
 				usedCached = true;
@@ -131,7 +163,7 @@ void bindAssimpTexturesToMaterial(Material *material, aiMaterial *assimpMat, aiT
 		}
 		
 		if(!usedCached){
-			Texture_Data texture = createTexture( (modelDirectory + "/" + path.C_Str()).c_str() );
+			Texture_Data texture = createTexture( (modelDirectory + "/" + path.C_Str()).c_str(), intType == 0 );
 			textureCache.push_back(texture);
 			
 			bindTextureToMaterial(material, &texture, intType);
@@ -141,14 +173,14 @@ void bindAssimpTexturesToMaterial(Material *material, aiMaterial *assimpMat, aiT
 
 // updates the position of all contained meshes (NOTE: do NOT call updateObjectData on a mesh if it is within a model!)
 void updateModel(Model *model){
-	for(int i = 0; i < model->meshes.size(); i++){
+	for(unsigned int i = 0; i < model->meshes.size(); i++){
 		glm::vec3 tempPosition = model->meshes[i].position;
 		glm::vec3 tempRotation = model->meshes[i].rotation;
 		glm::vec3 tempScale = model->meshes[i].scale;
 		
 		model->meshes[i].position += model->position;
 		model->meshes[i].rotation += model->rotation;
-		model->meshes[i].scale += model->scale;
+		model->meshes[i].scale *= model->scale;
 	
 		updateObjectData(&model->meshes[i]);
 		
@@ -164,7 +196,7 @@ void drawModel(Model *model, Camera *camera, ShaderProgram *program){
 	setUniformMat4(*program, "projection", camera->projection);
 	setUniformMat4(*program, "view", camera->view);
 	
-	for(int i = 0; i < model->meshes.size(); i++){
+	for(unsigned int i = 0; i < model->meshes.size(); i++){
 		/*Object_Data *object = &model->meshes[i];
 		
 		setUniformMat4(*program, "model", object->modelMatrix);

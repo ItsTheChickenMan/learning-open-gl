@@ -4,6 +4,7 @@
 #define PRACTICE_GRAPHICS_H
 
 #include <string>
+#include <vector>
 
 #include <shader.h>
 #include <types.h>
@@ -131,12 +132,51 @@ struct Object_Data {
 	Material material; // material
 };
 
+// a framebuffer which can be rendered to (useful for rendering the scene from a different perspective/settings and storing it for use in the scene itself)
+struct RenderableBuffer {
+	u32 FBO; // framebuffer (for color)
+	u32 RBO; // renderbuffer (for storing depth/stencil)
+	
+	Texture_Data colorBuffer; // color storage (normal texture)
+	
+	
+};
+
+struct DepthBuffer {
+	u32 FBO;
+	
+	u32 map;
+};
+
+// extension to light which casts shadows
+struct ShadowCaster {
+	glm::mat4 lightSpace;
+	glm::mat4 lightSpace2;
+	glm::mat4 lightSpace3;
+	glm::mat4 lightSpace4;
+	glm::mat4 lightSpace5;
+	glm::mat4 lightSpace6;
+	
+	DepthBuffer depthBuffer;
+};
 
 Vertex_Data createVertexData(float *vertexData, u32 vertexCount, u32 dataSize);
 Vertex_Data createVertexData(float *vertexData, u32 vertexCount, u32 dataSize, u32 *indices, u32 indicesCount, u32 indicesSize);
 void drawVertexData(Vertex_Data *data, ShaderProgram *shaderProgram);
 
-Texture_Data createTexture(const char* path);
+Texture_Data createTexture(const char* path, bool sRGB);
+Texture_Data createTexture(s32 width, s32 height, GLenum format);
+
+u32 createCubemap(std::vector<std::string> paths);
+void drawCubemap(u32 cubemap, Vertex_Data *cube_data, Camera *camera, ShaderProgram program);
+
+DepthBuffer generateDepthMap(s32 width, s32 height);
+DepthBuffer generateDepthCubemap(s32 width, s32 height);
+
+ShadowCaster createShadowCaster(DirectionalLight *lightSource);
+ShadowCaster createShadowCaster(PointLight *lightSource);
+
+RenderableBuffer createRenderableBuffer(s32 width, s32 height);
 
 Material createMaterial(glm::vec3 color, float shininess, float specularStrength);
 void bindTextureToMaterial(Material *material, Texture_Data *textureData, int type);

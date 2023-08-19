@@ -13,6 +13,7 @@
 #include <types.h>
 
 #define SHADER_VERTEX 	GL_VERTEX_SHADER
+#define SHADER_GEOMETRY GL_GEOMETRY_SHADER
 #define SHADER_FRAGMENT	GL_FRAGMENT_SHADER
 
 typedef u32 ShaderProgram;
@@ -20,7 +21,9 @@ typedef u32 ShaderProgram;
 u32 createShader(char* shaderPath, GLenum shaderType);
 void deleteShader(u32 shader);
 ShaderProgram createShaderProgram(u32 vertexShader, u32 fragmentShader);
+ShaderProgram createShaderProgram(u32 vertexShader, u32 geometryShader, u32 fragmentShader);
 ShaderProgram createShaderProgram(u32 vertexShader, u32 fragmentShader, const char* shaderName, const char* vertexName, const char* fragmentName);
+ShaderProgram createShaderProgram(u32 vertexShader, u32 geometryShader, u32 fragmentShader, const char* shaderName, const char* vertexName, const char* geometryName, const char* fragmentName);
 void useShader(ShaderProgram *program);
 
 void setUniformFloat(ShaderProgram program, const char* location, float data);

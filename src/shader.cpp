@@ -91,6 +91,54 @@ ShaderProgram createShaderProgram(u32 vertexShader, u32 fragmentShader, const ch
 	return program;
 }
 
+// create a shader program + geometry shader
+ShaderProgram createShaderProgram(u32 vertexShader, u32 geometryShader, u32 fragmentShader){
+	// create program
+	ShaderProgram program = glCreateProgram();
+	
+	// attach shaders
+	glAttachShader(program, vertexShader);
+	glAttachShader(program, geometryShader);
+	glAttachShader(program, fragmentShader);
+	
+	// link shaders
+	glLinkProgram(program);
+	
+	int success;
+	glGetProgramiv(program, GL_LINK_STATUS, &success);
+	if(!success){
+		char info[512];
+		glGetProgramInfoLog(program, 512, NULL, info);
+		printf("failed to link shader program: %s\n", info);
+	}  
+
+	return program;
+}
+
+// create a shader program + geometry shader with names for more error info
+ShaderProgram createShaderProgram(u32 vertexShader, u32 geometryShader, u32 fragmentShader, const char* shaderName, const char* vertexName, const char* geometryName, const char* fragmentName){
+	// create program
+	ShaderProgram program = glCreateProgram();
+	
+	// attach shaders
+	glAttachShader(program, vertexShader);
+	glAttachShader(program, geometryShader);
+	glAttachShader(program, fragmentShader);
+	
+	// link shaders
+	glLinkProgram(program);
+	
+	int success;
+	glGetProgramiv(program, GL_LINK_STATUS, &success);
+	if(!success){
+		char info[512];
+		glGetProgramInfoLog(program, 512, NULL, info);
+		printf("failed to link shader program %s (vertex: %s, geometry %s, fragment: %s): %s\n", shaderName, vertexName, geometryName, fragmentName, info);
+	}
+
+	return program;
+}
+
 // use a shader program
 void useShader(ShaderProgram *program){
 	glUseProgram(*program);

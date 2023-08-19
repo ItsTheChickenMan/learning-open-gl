@@ -7,6 +7,8 @@ struct Material {
 	sampler2D specularMaps[8]; // max of 8 specular
 	sampler2D emissionMaps[8]; // max of 8 emission
 	
+	sampler2D normalMap; // max of 1 normal
+	
 	int diffuseCount;
 	int specularCount;
 	int emissionCount;
@@ -70,6 +72,7 @@ struct SpotLight {
 in vec3 Normal;
 in vec3 FragPos;
 in vec2 TexCoords;
+in vec4 FragPosLightSpace;
 
 out vec4 FragColor;
 
@@ -85,22 +88,36 @@ uniform DirectionalLight directionalLights[MAX_DIRECTIONAL_LIGHTS];
 
 uniform vec3 cameraPos;
 
+uniform sampler2D shadowMap;
+
+uniform DirectionalLight shadowCaster;
+
 // quick definitions
 vec3 calculateDirectionalLight(DirectionalLight dlight, Material mat);
 vec3 calculatePointLight(PointLight plight, Material mat);
 vec3 calculateSpotLight(SpotLight slight, Material mat);
+float calculateFragInShadow(vec4 fragPosLightSpace);
+
+// misc
+uniform float testing;
+uniform samplerCube env;
+uniform float fun;
+
+#define PI 3.1415926535897
+#define GAMMA 2.2
 
 void main(){
 	// combine texture samples
-	vec3 diffuseSample = vec3(1, 1, 1);
+	vec4 diffuseSample = vec4(1, 1, 1, 1);
 	vec3 specularSample = vec3(1, 1, 1);
 	vec3 emissionSample = vec3(0, 0, 0);
 	
 	if(material.diffuseCount > 0){
-		diffuseSample = vec3(texture(material.diffuseMaps[0], TexCoords));
+		diffuseSample = texture(material.diffuseMaps[0], TexCoords);
+		//diffuseSample = pow(texture(material.diffuseMaps[0], TexCoords), vec4(vec3(GAMMA), 1.0));
 		
 		for(int i = 1; i < material.diffuseCount; i++){
-			diffuseSample = mix(diffuseSample, vec3(texture(material.diffuseMaps[i], TexCoords)), 0.5);
+			diffuseSample = mix(diffuseSample, texture(material.diffuseMaps[i], TexCoords), 0.5);
 		}
 	}
 	
@@ -134,8 +151,8 @@ void main(){
 		if(l.exists){
 			vec3 lightingFactors = calculatePointLight(l, material);
 			
-			ambient += material.color * diffuseSample * lightingFactors.x * l.color * l.ambient;
-			diffuse += material.color * diffuseSample * lightingFactors.y * l.color * l.diffuse;
+			ambient += material.color * vec3(diffuseSample) * lightingFactors.x * l.color * l.ambient;
+			diffuse += material.color * vec3(diffuseSample) * lightingFactors.y * l.color * l.diffuse;
 			specular += material.specularStrength * specularSample * lightingFactors.z * l.color * l.specular;
 		} else {
 			break;
@@ -148,8 +165,8 @@ void main(){
 		if(l.exists){	
 			vec3 lightingFactors = calculateSpotLight(l, material);
 			
-			ambient += material.color * diffuseSample * lightingFactors.x * l.color * l.ambient;
-			diffuse += material.color * diffuseSample * lightingFactors.y * l.color * l.diffuse;
+			ambient += material.color * vec3(diffuseSample) * lightingFactors.x * l.color * l.ambient;
+			diffuse += material.color * vec3(diffuseSample) * lightingFactors.y * l.color * l.diffuse;
 			specular += material.specularStrength * specularSample * lightingFactors.z * l.color * l.specular;
 		} else {
 			break;
@@ -162,17 +179,29 @@ void main(){
 		if(l.exists){
 			vec3 lightingFactors = calculateDirectionalLight(directionalLights[i], material);
 			
-			ambient += material.color * diffuseSample * lightingFactors.x * l.color * l.ambient;
-			diffuse += material.color * diffuseSample * lightingFactors.y * l.color * l.diffuse;
+			ambient += material.color * vec3(diffuseSample) * lightingFactors.x * l.color * l.ambient;
+			diffuse += material.color * vec3(diffuseSample) * lightingFactors.y * l.color * l.diffuse;
 			specular += material.specularStrength * specularSample * lightingFactors.z * l.color * l.specular;
 		} else {
 			break;
 		}
 	}
 	
+	/*if(testing == 1.0f){
+		float ratio = 1.00 / 1.33;
+
+		vec3 I = normalize(FragPos - cameraPos);
+		vec3 R = reflect(I, normalize(Normal));
+		
+		FragColor = vec4(texture(env, R).rgb, 1.0);
+		return;
+	}*/
+	
 	// final color
-	vec3 final = ambient + diffuse + specular + emissionSample;
-	FragColor = vec4(final, 1.0);
+	float shadow = calculateFragInShadow(FragPosLightSpace);
+	vec3 final = ambient + (1.0 - shadow) * (diffuse + specular) + emissionSample;
+	final.rgb = pow(final, vec3(1.0/GAMMA));
+	FragColor = vec4(final, diffuseSample.w);
 }
 
 // return a vec3 containing the ambient, diffuse and specular lighting factors (ambient, diffuse, specular)
@@ -202,10 +231,17 @@ vec3 calculatePointLight(PointLight plight, Material mat){
 	float diffuseFactor = max(dot(normalNormal, lightDir), 0.0);
 	
 	// specular
-	vec3 viewDir = normalize(cameraPos - FragPos); // view space calculation
+	/*vec3 viewDir = normalize(cameraPos - FragPos); // view space calculation
 	vec3 reflectDir = reflect(-lightDir, normalNormal);
 	float specularFactor = pow(max(dot(viewDir, reflectDir), 0.0), mat.shininess);
-
+	*/
+	// blinn phong experiment
+	vec3 viewDir = normalize(cameraPos - FragPos);
+	vec3 halfway = normalize(lightDir + viewDir);
+	
+	float specularFactor = pow(max(dot(halfway, normalNormal), 0.0), mat.shininess);
+	
+	
 	float dist = length(plight.position - FragPos);
 	float attenuation = 1.0 / (plight.constant + plight.linear*dist + plight.quadratic*dist*dist);
 
@@ -236,4 +272,38 @@ vec3 calculateSpotLight(SpotLight slight, Material mat){
 	float attenuation = 1.0 / (slight.constant + slight.linear*dist + slight.quadratic*dist*dist);
 	
 	return vec3(ambientFactor*attenuation, diffuseFactor*spotlightFactor*attenuation, specularFactor*spotlightFactor*attenuation);
+}
+
+float calculateFragInShadow(vec4 fragPosLightSpace){
+	// perform perspective divide (not done automatically because not passed through gl_Position)
+  vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+	
+	projCoords = projCoords * 0.5 + 0.5;
+	
+	if(projCoords.z > 1.0)
+		return 0.0;
+
+	vec3 lightDir = normalize(shadowCaster.direction);
+	
+	float closestDepth = texture(shadowMap, projCoords.xy).r;
+
+	float currentDepth = projCoords.z;
+	
+	//float bias = max(0.05 * (1.0 - dot(normalize(Normal), lightDir)), 0.005);
+	float bias = 0.0;
+	
+	float shadow = 0.0;
+	vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
+	for(float x = -2; x <= 2; x++)
+	{
+			for(float y = -2; y <= 2; y++)
+			{
+					float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r; 
+					shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;        
+			}    
+	}
+	shadow /= 25.0;
+
+	// if the currentDepth is greater (therefore further) than the closest depth, then the fragment is in shadow)
+	return shadow;
 }

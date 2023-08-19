@@ -28,6 +28,8 @@ void windowUpdate(Window *window);
 void windowTerminate();
 GLboolean windowShouldClose(Window *window);
 
+void windowEnableMSAA(u32 samples);
+
 s32 windowLog(char* log);
 s32 windowError(char* error, s32 code);
 

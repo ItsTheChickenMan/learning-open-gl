@@ -117,7 +117,7 @@ void drawVertexData(Vertex_Data *data, ShaderProgram *shaderProgram){
 // TEXTURE MANAGEMENT //
 
 // create a texture
-Texture_Data createTexture(const char* path){
+Texture_Data createTexture(const char* path, bool sRGB){
 	Texture_Data textureData;
 	
 	textureData.path = std::string(path);
@@ -140,11 +140,26 @@ Texture_Data createTexture(const char* path){
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
+		GLint internalFormat = GL_RGB;
+		
+		// TODO: this is dumb
+		if(sRGB){
+			if(textureData.channels == 3){
+				internalFormat = GL_SRGB;
+			} else {
+				internalFormat = GL_SRGB_ALPHA;
+			}
+		} else {
+			if(textureData.channels == 4){
+				internalFormat = GL_RGBA;
+			}
+		}
+		
 		// generate texture
 		if(textureData.channels == 3)
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, textureData.width, textureData.height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+			glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, textureData.width, textureData.height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
 		else if(textureData.channels == 4)
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, textureData.width, textureData.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+			glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, textureData.width, textureData.height, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
 		
 		// generate mipmaps
 		glGenerateMipmap(GL_TEXTURE_2D);
@@ -158,6 +173,267 @@ Texture_Data createTexture(const char* path){
 	stbi_image_free(data);
 	
 	return textureData;
+}
+
+// create a texture without predefined data (aka a texture path) (usually used for RenderableBuffers)
+Texture_Data createTexture(s32 width, s32 height, GLenum format){
+	Texture_Data textureData;
+	
+	textureData.width = width;
+	textureData.height = height;
+	
+	// create texture
+	glGenTextures(1, &textureData.texture);
+	
+	// bind texture
+	glBindTexture(GL_TEXTURE_2D, textureData.texture); // bind texture so function calls affect it
+	
+	// assign parameters
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+	// generate texture
+	glTexImage2D(GL_TEXTURE_2D, 0, format, textureData.width, textureData.height, 0, format, GL_UNSIGNED_BYTE, NULL);
+
+	glBindTexture(GL_TEXTURE_2D, 0);
+	
+	return textureData;
+}
+
+u32 createCubemap(std::vector<std::string> paths){
+	u32 cubemap;
+	
+	glGenTextures(1, &cubemap);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap);
+	
+	s32 width, height, channels;
+	u8 *data;
+	
+	stbi_set_flip_vertically_on_load(false); // flip because opengl expects textures to start at end of buffers
+	
+	for(u32 i = 0; i < paths.size(); i++){
+		data = stbi_load(paths[i].c_str(), &width, &height, &channels, 0);
+		
+		if(data){
+			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+		} else {
+			printf("Error loading skybox: couldn't load texture data\n");
+		}
+		
+		stbi_image_free(data);
+	}
+	
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	
+	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+	
+	return cubemap;
+}
+
+// putting this in here cause I can't think of a better place for it
+// generate a depth framebuffer used for shadow mapping
+DepthBuffer generateDepthMap(s32 width, s32 height){
+	DepthBuffer buffer;
+
+	glGenFramebuffers(1, &buffer.FBO);
+	
+	glGenTextures(1, &buffer.map);
+	
+	glBindTexture(GL_TEXTURE_2D, buffer.map);
+	
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);  
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, buffer.FBO);
+	
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, buffer.map, 0);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+	
+	// make sure framebuffer is complete
+	if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE){
+		printf("There was an error creating DepthMap, framebuffer is incomplete: ");
+		
+		if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT){
+			printf("Incomplete attachment\n");
+		} else if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE){
+			printf("Multisample err (see docs)\n");
+		} else if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT){
+			printf("Missing attachment\n");
+		} else if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_UNSUPPORTED){
+			printf("Unsupported attachments\n");
+		} else if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS){
+			printf("Layer targets (see docs)\n");
+		} else {
+			printf("Unknown error\n");
+		}
+	}
+	
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	
+	return buffer;
+}
+
+DepthBuffer generateDepthCubemap(s32 width, s32 height){
+	DepthBuffer buffer;
+	
+	glGenFramebuffers(1, &buffer.FBO);
+	
+	glGenTextures(1, &buffer.map);
+	
+	glBindTexture(GL_TEXTURE_CUBE_MAP, buffer.map);
+	
+	for(unsigned int i = 0; i < 6; i++)
+		glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);  
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+	float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, buffer.FBO);
+	
+	glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, buffer.map, 0);
+	glDrawBuffer(GL_NONE);
+	glReadBuffer(GL_NONE);
+	
+	// make sure framebuffer is complete
+	if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE){
+		printf("There was an error creating DepthMap, framebuffer is incomplete: ");
+		
+		if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT){
+			printf("Incomplete attachment\n");
+		} else if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE){
+			printf("Multisample err (see docs)\n");
+		} else if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT){
+			printf("Missing attachment\n");
+		} else if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_UNSUPPORTED){
+			printf("Unsupported attachments\n");
+		} else if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS){
+			printf("Layer targets (see docs)\n");
+		} else {
+			printf("Unknown error\n");
+		}
+	}
+	
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	
+	return buffer;
+}
+
+void drawCubemap(u32 cubemap, Vertex_Data *cube_data, Camera *camera, ShaderProgram program){
+	glm::mat4 view = glm::mat4(glm::mat3(camera->view));
+	
+	useShader(&program);
+	
+	glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap);	
+	
+	setUniformMat4(program, "projection", camera->projection);
+	setUniformMat4(program, "view", view);
+	
+	glBindVertexArray(cube_data->VAO);
+	glDrawArrays(GL_TRIANGLES, 0, cube_data->vertexCount);
+	
+	glBindVertexArray(0);
+}
+
+// create directional light shadow caster
+ShadowCaster createShadowCaster(DirectionalLight *lightSource){
+	ShadowCaster caster;
+	
+	glm::mat4 projection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 0.1f, 20.5f);
+	glm::vec3 viewPos = glm::vec3(0, -1, -8);
+	glm::mat4 view = glm::lookAt(viewPos, viewPos + glm::normalize(lightSource->direction), glm::vec3(0, 1, 0));
+	
+	caster.lightSpace = projection * view;
+	
+	caster.depthBuffer = generateDepthMap(1024, 1024);
+	
+	return caster;
+}
+
+// create a point light shadow caster
+ShadowCaster createShadowCaster(PointLight *lightSource){
+	ShadowCaster caster;
+	
+	glm::mat4 projection = glm::perspective(glm::radians(90.0f), 1.0f, 1.0f, 25.0f);
+	
+	caster.lightSpace =  projection * glm::lookAt(lightSource->position, lightSource->position + glm::vec3( 1, 0, 0), glm::vec3(0, -1, 0));
+	caster.lightSpace2 = projection * glm::lookAt(lightSource->position, lightSource->position + glm::vec3(-1, 0, 0), glm::vec3(0, -1, 0));
+	caster.lightSpace3 = projection * glm::lookAt(lightSource->position, lightSource->position + glm::vec3(0,  1, 0), glm::vec3(0, 0,  1));
+	caster.lightSpace4 = projection * glm::lookAt(lightSource->position, lightSource->position + glm::vec3(0, -1, 0), glm::vec3(0, 0, -1));
+	caster.lightSpace5 = projection * glm::lookAt(lightSource->position, lightSource->position + glm::vec3(0, 0,  1), glm::vec3(0, -1, 0));
+	caster.lightSpace6 = projection * glm::lookAt(lightSource->position, lightSource->position + glm::vec3(0, 0, -1), glm::vec3(0, -1, 0));
+	
+	caster.depthBuffer = generateDepthCubemap(1024, 1024);
+	
+	return caster;
+}
+
+void recalculateLightSpace(ShadowCaster *caster, DirectionalLight *lightSource){
+	glm::mat4 projection = glm::ortho(-10.0f, 10.0f, -10.0f, 10.0f, 0.1f, 20.5f);
+	glm::vec3 viewPos = glm::vec3(0, -1, -8);
+	glm::mat4 view = glm::lookAt(viewPos, viewPos + glm::normalize(lightSource->direction), glm::vec3(0, 1, 0));
+	
+	caster->lightSpace = projection * view;
+}
+
+RenderableBuffer createRenderableBuffer(s32 width, s32 height){
+	RenderableBuffer buffer;
+	
+	// create framebuffer
+	glGenFramebuffers(1, &buffer.FBO);
+	glBindFramebuffer(GL_FRAMEBUFFER, buffer.FBO);
+	
+	// create/bind color buffer
+	buffer.colorBuffer = createTexture(width, height, GL_RGB);
+	
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, buffer.colorBuffer.texture, 0);
+
+	// create renderbuffer
+	glGenRenderbuffers(1, &buffer.RBO);
+	glBindRenderbuffer(GL_RENDERBUFFER, buffer.RBO);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
+	glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	
+	// attach to framebuffer
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, buffer.RBO);
+	
+	// make sure framebuffer is complete
+	if(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE){
+		printf("There was an error creating RenderableBuffer, framebuffer is incomplete: ");
+		
+		if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT){
+			printf("Incomplete attachment\n");
+		} else if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_INCOMPLETE_MULTISAMPLE){
+			printf("Multisample err (see docs)\n");
+		} else if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT){
+			printf("Missing attachment\n");
+		} else if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_UNSUPPORTED){
+			printf("Unsupported attachments\n");
+		} else if(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_INCOMPLETE_LAYER_TARGETS){
+			printf("Layer targets (see docs)\n");
+		} else {
+			printf("Unknown error\n");
+		}
+	}
+	
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	
+	return buffer;
 }
 
 // MATERIAL //
@@ -177,7 +453,7 @@ Material createMaterial(glm::vec3 color, float shininess, float specularStrength
 	return material;
 }
 
-// bind a texture to vertex data (you might've guessed)
+// bind a texture to material (you might've guessed)
 void bindTextureToMaterial(Material *material, Texture_Data *textureData, int type){
 	if(type == DIFFUSE_MAP){
 		material->diffuseMaps[material->diffuseCount++] = textureData->texture;
